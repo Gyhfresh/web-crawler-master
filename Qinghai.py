@@ -1,0 +1,104 @@
+from selenium import webdriver
+import requests
+from bs4 import BeautifulSoup
+import time
+import urllib.request as ur
+import os.path as osp
+import json
+
+
+#存入json文件
+def list_to_json(doc_list, file_name):
+    '''
+
+    Args:
+        doc_list: 包含文件属性信息的列表
+        file_name: 存入json文件的名称
+
+    Returns: 无
+
+    '''
+    for i in range(len(doc_list)):
+        if i == 0:
+            js = json.dumps(doc_list[i], ensure_ascii=False)
+            f = open(file_name, 'w', encoding='utf-8')
+            f.write(js + '\n')
+            f.close()
+        else:
+            js = json.dumps(doc_list[i], ensure_ascii=False)
+            f = open(file_name, 'a', encoding='utf-8')
+            f.write(js + '\n')
+            f.close()
+
+
+base_url = 'http://tjj.qinghai.gov.cn/nj/2020/'
+headers = {'USER-AGENT': 'Mozilla/5.0 (iPad; U; CPU OS 3_2_1 like Mac OS X; en-us) AppleWebKit/531.21.10 (KHTML, like Gecko) Mobile/7B405'}
+url = 'http://tjj.qinghai.gov.cn/nj/2018/indexch.htm'
+
+download_dir = r'D:\YangChenyang\项目\中国移动项目\青海\青海统计年鉴'
+driver = webdriver.Chrome()
+data_info = []
+for year in range(10, 21):
+    base_url = 'http://tjj.qinghai.gov.cn/nj/20{}/'.format(str(year))
+    url = 'http://tjj.qinghai.gov.cn/nj/20{}/indexch.htm'.format(str(year))
+    print(url)
+    driver.get(url)
+    driver.switch_to.frame('contents')#打开#document里的内容
+    html = driver.page_source
+    soup = BeautifulSoup(html, 'html.parser')
+    tr = soup.find_all('tr')
+    foldheader = tr[-1].find_all('li', id='foldheader')
+    foldinglist = tr[-1].find_all('ul', id='foldinglist')
+
+    i = 0
+    for cata, content in zip(foldheader[1:], foldinglist[1:]):
+        title = cata.text.strip().split(' ')
+        topic = title[-1]
+        sections = content.find_all('a')
+        for section in sections:
+            if section.get('href') == None:
+                continue
+            add_url = section.get('href').replace('.htm', '.xls')
+            url = base_url + add_url
+            name2 = section.text.strip().split(' ')[-1]
+            name = ''.join(section.text.strip().split(' ')[1:])
+            if not '续' in section.text:
+                main_name = name
+            else:
+                name = main_name + '_' + name2
+
+            if section.text.strip() == '主要统计指标解释':
+                continue
+            else:
+                try:
+                    req = ur.Request(url=url, headers=headers)
+                    r = ur.urlopen(req)
+                    data = r.read()
+
+                    name = name + '_' + '20' + str(year) + '.xls'
+                    if len(name) <= 18:
+                        continue
+                    print(name)
+                    with open(download_dir + '/' + name, 'wb') as f:
+                        f.write(data)
+                    i += 1
+                    time.sleep(0.1)
+                    data_info_dict = {}
+                    data_info_dict['name'] = name
+                    data_info_dict['theme'] = topic
+                    data_info_dict['info'] = {}
+                    data_info_dict['info']['time'] = '20' + str(year)
+                    print(data_info_dict)
+                    data_info.append(data_info_dict)
+                except:
+                    continue
+
+
+list_to_json(data_info, '青海统计年鉴.json')
+driver.close()
+
+
+
+
+
+
